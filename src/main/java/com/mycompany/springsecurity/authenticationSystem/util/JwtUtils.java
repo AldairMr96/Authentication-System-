@@ -9,6 +9,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -24,69 +25,42 @@ public class JwtUtils {
     @Value("${security.jwt.user.generator}")
     private String userGenerator;
 
+    private static  final long EXPIRATION_TIME = 1800000;
 
+    public String createToken(String username, String authorities){
 
-    public String createToken(Authentication authentication) {
-
-        //Authentication algorithm is Sha256
-            Algorithm algorithmCrypted = Algorithm.HMAC256(this.privateKey);
-
-            String username = authentication.getPrincipal().toString();
-
-
-            String authorities = authentication.getAuthorities()
-                    .stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .collect(Collectors.joining(","));
-
-
-            String jwtToken = JWT.create()
-
-                    .withIssuer(this.userGenerator)
+            return JWT.create()
                     .withSubject(username)
                     .withClaim("authorities", authorities)
-                    .withIssuedAt(new Date())
-                    .withExpiresAt(new Date(System.currentTimeMillis() + 1800000))
-                    .withJWTId(UUID.randomUUID().toString())
-                    .withNotBefore(new Date(System.currentTimeMillis()))
-                    .sign(algorithmCrypted);
-
-            return jwtToken;
-
+                    .withExpiresAt(new Date(System.currentTimeMillis()+ EXPIRATION_TIME))
+                    .sign(Algorithm.HMAC256(privateKey))
+                    ;
     }
 
-    public DecodedJWT verifyToken(String jwtToken) {
-
-
-        try {
-            Algorithm algorithmCrypted = Algorithm.HMAC256(this.privateKey);
-            JWTVerifier jwtVerifier = JWT.require(algorithmCrypted)
-                    .withIssuer(this.userGenerator)
-                    .build();
-            DecodedJWT decodedJWT = jwtVerifier.verify(jwtToken);
-            return decodedJWT;
-
-
-        } catch (JWTVerificationException exception) {
-
-            throw new JWTVerificationException("Token invalid, not authorized");
-        }
-
+    public String extractUsername(String token) {
+        return JWT.require(Algorithm.HMAC256(privateKey))
+                .build()
+                .verify(token)
+                .getSubject()
+                ;
+    }
+    public Boolean verifyToken(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
 
-    public String extractUsername(DecodedJWT decodedJWT) {
-
-
-        return decodedJWT.getSubject().toString();
+    public boolean isTokenExpired (String token){
+        DecodedJWT decodedJWT = JWT.require(Algorithm.HMAC256(privateKey))
+                .build()
+                .verify(token);
+        return decodedJWT.getExpiresAt().before(new Date());
+    }
+    public String extractAuthorities(String token) {
+        return JWT.require(Algorithm.HMAC256(privateKey))
+                .build()
+                .verify(token)
+                .getClaim("authorities").asString();
     }
 
-    public Claim getSpecificClaim(DecodedJWT decodedJWT, String clameName) {
 
-        return decodedJWT.getClaim(clameName);
-    }
-
-    public Map<String, Claim> getAllClaims(DecodedJWT decodedJWT) {
-        //Traer todos los claims
-        return decodedJWT.getClaims();
-    }
 }

@@ -11,10 +11,13 @@ import com.mycompany.springsecurity.authenticationSystem.repository.IUserReposit
 import com.mycompany.springsecurity.authenticationSystem.util.JwtUtils;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -25,6 +28,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService implements UserDetailsService, IUserService {
@@ -116,18 +120,28 @@ public class UserService implements UserDetailsService, IUserService {
     }
 
 
-    public AuthResponse loginUser (AuthLoginRequest authLoginRequest){
-
+    public AuthResponse loginUser (AuthLoginRequest authLoginRequest, AuthenticationManager authenticationManager){
         String username = authLoginRequest.username();
         String password = authLoginRequest.password();
-        Authentication authenticationToken = this.authenticate(username, password);
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
-        String accessToken = jwtUtils.createToken(authenticationToken);
+        try{
+            Authentication authToken = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, password)
+            );
+            SecurityContextHolder.getContext().setAuthentication(authToken);
 
+            UserDetails userDetails = this.loadUserByUsername(username);
 
-        AuthResponse authResponse = new AuthResponse(username, "Login susscessfully", accessToken, true);
-        return authResponse;
+            String authorities = userDetails.getAuthorities()
+                           .stream()
+                           .map(GrantedAuthority::getAuthority)
+                           .collect(Collectors.joining(","));
+
+            String accessToken = jwtUtils.createToken(userDetails.getUsername(), authorities);
+            return new AuthResponse(username, "Login Successfully", accessToken, true);
+        }catch (BadCredentialsException ex){
+            throw new BadCredentialsException("Invalid username or password");
+        }
 
     }
     public Authentication authenticate(String username, String password){
@@ -140,7 +154,7 @@ public class UserService implements UserDetailsService, IUserService {
         return new UsernamePasswordAuthenticationToken(username, userDetail.getPassword(), userDetail.getAuthorities());
     }
     @Override
-    public void createUser(AuthCreateUserRequest authCreateUserRequest) {
+    public AuthResponse createUser(AuthCreateUserRequest authCreateUserRequest) {
         String usernameRequest = authCreateUserRequest.username().trim();
         String passwordRequest = passwordEncoder.encode(authCreateUserRequest.password());
         RolesEnum roleEnumRequest = RolesEnum.valueOf (authCreateUserRequest.roleRequest().roleName());
@@ -164,7 +178,25 @@ public class UserService implements UserDetailsService, IUserService {
 
         userRepository.save(userEntity);
 
+        //add roles and permissions
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_".concat(userEntity.getRoleType().getRoleTypeEnum().name())));
+        userEntity.getRoleType().getRolePermissions()
+                .forEach(rolePermission ->
+                        authorities.add(
+                         new SimpleGrantedAuthority(userEntity.getRoleType().getRoleTypeEnum().name()))
+                );
+        UserDetails userDetails = this.loadUserByUsername(userEntity.getUsername());
+        String role = userDetails.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
 
+        String accessToken = jwtUtils.createToken(userDetails.getUsername(), role);
+
+        AuthResponse authResponse = new AuthResponse(userEntity.getUsername(), "User created successfully", accessToken, true);
+
+        return authResponse;
 
     }
 

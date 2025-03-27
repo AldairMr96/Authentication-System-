@@ -2,6 +2,7 @@ package com.mycompany.springsecurity.authenticationSystem.controller;
 
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateUserRequest;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthLoginRequest;
+import com.mycompany.springsecurity.authenticationSystem.dto.AuthResponse;
 import com.mycompany.springsecurity.authenticationSystem.model.UserEntity;
 import com.mycompany.springsecurity.authenticationSystem.repository.IUserRepository;
 import com.mycompany.springsecurity.authenticationSystem.service.IUserService;
@@ -10,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,8 @@ public class UserController {
     private UserDetailsService userDetailService;
     @Autowired
     private IUserService userService;
+    @Autowired
+    private AuthenticationManager authenticationManager;
     @GetMapping("/get")
     @ResponseStatus(HttpStatus.OK)
     public List <UserEntity> getUsers(){
@@ -47,8 +51,8 @@ public class UserController {
     @PostMapping("/sign-in")
     @ResponseStatus(HttpStatus.CREATED)
     public  ResponseEntity<?> createUser(@RequestBody @Valid AuthCreateUserRequest userRequest){
-        userService.createUser(userRequest);
-        return  ResponseEntity.ok("Create user susccessfully ");
+
+        return  ResponseEntity.ok(userService.createUser(userRequest)  );
     }
     @PutMapping("/edit")
     public ResponseEntity<?> editUser(@RequestBody UserEntity userEntity) {
@@ -79,7 +83,7 @@ public class UserController {
     @PostMapping("/log-in")
     public ResponseEntity<?> loginUser (@RequestBody @Valid AuthLoginRequest userRequest){
         try {
-            return new ResponseEntity<>(this.userService.loginUser(userRequest), HttpStatus.OK);
+            return new ResponseEntity<>(this.userService.loginUser(userRequest, authenticationManager), HttpStatus.OK);
         } catch (BadCredentialsException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
         } catch (Exception ex) {

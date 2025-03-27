@@ -1,6 +1,7 @@
 package com.mycompany.springsecurity.authenticationSystem.config.filter;
 
 
+import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.mycompany.springsecurity.authenticationSystem.util.JwtUtils;
 import jakarta.servlet.FilterChain;
@@ -33,29 +34,34 @@ public class JwtTokenValidator extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        String jwtToken = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if(jwtToken != null){
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-            //Delete bearer word
-            jwtToken = jwtToken.substring(7);
-           DecodedJWT decodedJWT= jwtUtils.verifyToken(jwtToken);
-
-
-            String username = jwtUtils.extractUsername(decodedJWT);
-            String stringAuthorities =  jwtUtils.getSpecificClaim(decodedJWT, "authorities").asString();
-
-            Collection<? extends GrantedAuthority> authorities =
-                    AuthorityUtils.commaSeparatedStringToAuthorityList(stringAuthorities);
-
-            SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-
-            Authentication authenticationToken = new UsernamePasswordAuthenticationToken(
-                    username, null, authorities
-            );
-
-            securityContext.setAuthentication(authenticationToken);
-            SecurityContextHolder.setContext(securityContext);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
         }
+
+        String jwt = authHeader.substring(7);
+
+        try {
+            String username = jwtUtils.extractUsername(jwt);
+            String authorities = jwtUtils.extractAuthorities(jwt);
+
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                        username,
+                        null,
+                        AuthorityUtils.commaSeparatedStringToAuthorityList(authorities)
+                );
+
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            }
+        } catch (JWTVerificationException ex) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Invalid JWT token");
+            return;
+        }
+
         filterChain.doFilter(request, response);
     }
 }

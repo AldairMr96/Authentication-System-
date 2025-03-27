@@ -4,11 +4,12 @@ import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateUserReque
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthLoginRequest;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthResponse;
 import com.mycompany.springsecurity.authenticationSystem.model.UserEntity;
+import org.springframework.security.authentication.AuthenticationManager;
 
 import java.util.List;
 
 public interface IUserService {
-    public  void createUser (AuthCreateUserRequest authCreateUserRequest);
+    public  AuthResponse createUser (AuthCreateUserRequest authCreateUserRequest);
 
     public List<UserEntity> getUser();
 
@@ -17,7 +18,7 @@ public interface IUserService {
     public void deleteUserById (Long idUserEntity);
 
     public UserEntity editUser (UserEntity userEntity);
-    public AuthResponse loginUser (AuthLoginRequest authLoginRequest);
+    public AuthResponse loginUser (AuthLoginRequest authLoginRequest, AuthenticationManager authenticationManager);
 
 
 }

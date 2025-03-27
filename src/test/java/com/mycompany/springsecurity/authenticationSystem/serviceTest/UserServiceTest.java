@@ -1,5 +1,6 @@
 package com.mycompany.springsecurity.authenticationSystem.service;
 
+import com.jayway.jsonpath.internal.function.text.Concatenate;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateRoleRequest;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateUserRequest;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthLoginRequest;
@@ -63,7 +64,7 @@ class UserServiceTest {
         // Arrange
         String username = "testUser";
         Role mockRole = new Role();
-        mockRole.setRoleTypeEnum(RolesEnum.ROLE_USER);
+        mockRole.setRoleTypeEnum(RolesEnum.USER);
         mockRole.setRolePermissions(Set.of());
 
         UserEntity mockUser = new UserEntity();
@@ -103,7 +104,7 @@ class UserServiceTest {
         String username = "newUser";
         String rawPassword = "password";
         String encodedPassword = "encodedPassword";
-        RolesEnum roleEnum = RolesEnum.ROLE_USER;
+        RolesEnum roleEnum = RolesEnum.USER;
 
         AuthCreateUserRequest request = new AuthCreateUserRequest(username, rawPassword, new AuthCreateRoleRequest(roleEnum.name()));
 

@@ -40,35 +40,27 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain (HttpSecurity httpSecurity) throws Exception {
 
-        return httpSecurity
-                .csrf(csrf -> csrf.disable()) //cross site request forgering
-                .httpBasic(Customizer.withDefaults()) //Defalt is user and password
+         httpSecurity
+                .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frame -> frame.disable())) // Allow use of frames for H2 Console
+                .httpBasic(Customizer.withDefaults()) // Default is user and password
                 .sessionManagement(
-                        session-> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(http -> {
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> {
 
-                    http.requestMatchers(HttpMethod.GET, "/authentication/get").permitAll();
+                    auth.requestMatchers("/h2-console/**").permitAll(); // Allow access to H2 Console
+                    auth.requestMatchers(HttpMethod.GET, "/authentication/get").permitAll();
+                    auth.requestMatchers(HttpMethod.POST, "/authentication/log-in").permitAll();
+                    auth.requestMatchers(HttpMethod.POST, "/authentication/sign-in").permitAll();
+                    auth.requestMatchers(HttpMethod.GET, "/authentication/find").hasAnyRole("DEVELOPER", "MANAGER");
+                    auth.requestMatchers(HttpMethod.PUT, "/authentication/edit").hasAnyRole("DEVELOPER", "MANAGER");
+                    auth.requestMatchers(HttpMethod.DELETE, "/authentication/delete").hasAnyRole("DEVELOPER", "MANAGER");
 
-                    http.requestMatchers(HttpMethod.POST, "/authentication/log-in").permitAll();
-
-                    http.requestMatchers(HttpMethod.POST, "/authentication/sign-in").permitAll();
-
-
-                    http.requestMatchers(HttpMethod.GET, "/authentication/find").hasAnyRole("DEVELOPER", "MANAGER");
-
-
-                    http.requestMatchers(HttpMethod.PUT,"/authentication/edit").hasAnyRole("DEVELOPER", "MANAGER");
-
-                    http.requestMatchers(HttpMethod.DELETE,"/authentication/delete").hasAnyRole("DEVELOPER", "MANAGER");
-
-
-
-
-                   http.anyRequest().authenticated();
+                    auth.anyRequest().authenticated();
                 })
+                .addFilterBefore(jwtTokenValidator, BasicAuthenticationFilter.class);
 
-                .addFilterBefore(jwtTokenValidator, BasicAuthenticationFilter.class)
-                .build();
+                return httpSecurity.build();
     }
 
 
@@ -87,6 +79,8 @@ public class SecurityConfig {
         dap.setUserDetailsService(userDetailsServiceImpl);
         return dap ;
     }
+
+
 
 
 
