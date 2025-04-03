@@ -5,9 +5,7 @@ import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateRoleReque
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateUserRequest;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthLoginRequest;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthResponse;
-import com.mycompany.springsecurity.authenticationSystem.model.Role;
-import com.mycompany.springsecurity.authenticationSystem.model.RolesEnum;
-import com.mycompany.springsecurity.authenticationSystem.model.UserEntity;
+import com.mycompany.springsecurity.authenticationSystem.model.*;
 import com.mycompany.springsecurity.authenticationSystem.repository.IRoleRepository;
 import com.mycompany.springsecurity.authenticationSystem.repository.IUserRepository;
 import com.mycompany.springsecurity.authenticationSystem.util.JwtUtils;
@@ -18,8 +16,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -41,14 +44,11 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
-    @Mock
-    private UserService userServiceMock;
 
 
     @Mock
-    private UserDetails userDetails;
-    @Mock
-    private UserDetails userDetail;
+    private AuthenticationManager authManager;
+
 
     @InjectMocks
     private UserService userService;
@@ -65,8 +65,9 @@ class UserServiceTest {
         String username = "testUser";
         Role mockRole = new Role();
         mockRole.setRoleTypeEnum(RolesEnum.USER);
-        mockRole.setRolePermissions(Set.of());
-
+        Permission permission = new Permission(1L, "READ", null);
+        RolePermission rolePermission = new RolePermission(1L, mockRole, permission);
+        mockRole.setRolePermissions(Set.of(rolePermission));
         UserEntity mockUser = new UserEntity();
         mockUser.setUsername(username);
         mockUser.setPassword("password");
@@ -75,6 +76,22 @@ class UserServiceTest {
         mockUser.setCreadentialNoExpired(true);
         mockUser.setAccountNoLocked(true);
         mockUser.setRoleType(mockRole);
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_".concat(mockUser.getRoleType().getRoleTypeEnum().name())));
+        mockUser.getRoleType().getRolePermissions()
+                .forEach(rolePermissionFinding -> authorities.add(new SimpleGrantedAuthority(rolePermission.getPermission().getNamePermission())));
+
+        User userDetail = new User(
+                mockUser.getUsername(),
+                mockUser.getPassword(),
+                mockUser.getIsEnable(),
+                mockUser.getAccountNoExpired(),
+                mockUser.getCreadentialNoExpired(),
+                mockUser.getAccountNoLocked(),
+                authorities
+        );
+
+
 
         when(userRepository.findUserEntityByUsername(username)).thenReturn(Optional.of(mockUser));
 
@@ -101,32 +118,66 @@ class UserServiceTest {
     @Test
     void testCreateUserSuccess() {
         // Arrange
-        String username = "newUser";
+        String username = "testUser";
         String rawPassword = "password";
         String encodedPassword = "encodedPassword";
-        RolesEnum roleEnum = RolesEnum.USER;
 
-        AuthCreateUserRequest request = new AuthCreateUserRequest(username, rawPassword, new AuthCreateRoleRequest(roleEnum.name()));
 
         Role mockRole = new Role();
-        mockRole.setRoleTypeEnum(roleEnum);
+        mockRole.setRoleTypeEnum(RolesEnum.USER);
 
+        Permission permission = new Permission(1L, "READ", null);
+        RolePermission rolePermission = new RolePermission(1L, mockRole, permission);
+        mockRole.setRolePermissions(Set.of(rolePermission));
+
+        UserEntity mockUserEntity = new UserEntity();
+        mockUserEntity.setUsername(username);
+        mockUserEntity.setPassword(encodedPassword);
+        mockUserEntity.setIsEnable(true);
+        mockUserEntity.setAccountNoExpired(true);
+        mockUserEntity.setCreadentialNoExpired(true);
+        mockUserEntity.setAccountNoLocked(true);
+        mockUserEntity.setRoleType(mockRole);
+
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + mockUserEntity.getRoleType().getRoleTypeEnum().name()));
+        mockUserEntity.getRoleType().getRolePermissions()
+                .forEach(rolePermissionFinding -> authorities.add(new SimpleGrantedAuthority(rolePermissionFinding.getPermission().getNamePermission())));
+
+        User userDetail = new User(
+                mockUserEntity.getUsername(),
+                mockUserEntity.getPassword(),
+                mockUserEntity.getIsEnable(),
+                mockUserEntity.getAccountNoExpired(),
+                mockUserEntity.getCreadentialNoExpired(),
+                mockUserEntity.getAccountNoLocked(),
+                authorities
+        );
+        AuthCreateUserRequest request = new AuthCreateUserRequest(username, rawPassword, new AuthCreateRoleRequest(mockRole.getRoleTypeEnum().name()));
+
+        // Configurar comportamiento de los mocks
         when(userRepository.existsByUsername(username)).thenReturn(false);
-        when(roleRepository.findByRoleTypeEnum(roleEnum)).thenReturn(Optional.of(mockRole));
+        when(roleRepository.findByRoleTypeEnum(mockRole.getRoleTypeEnum())).thenReturn(Optional.of(mockRole));
         when(passwordEncoder.encode(rawPassword)).thenReturn(encodedPassword);
+        when(userRepository.findUserEntityByUsername(username)).thenReturn(Optional.of(mockUserEntity));
+        when(jwtUtils.createToken(anyString(), anyString())).thenReturn("token");
 
         // Act
-        userService.createUser(request);
+        AuthResponse authResponse = userService.createUser(request);
 
         // Assert
         verify(userRepository, times(1)).save(any(UserEntity.class));
+        assertEquals(username, authResponse.username());
+        assertEquals("User created successfully", authResponse.message());
+        assertEquals("token", authResponse.jwt());
+        assertTrue(authResponse.status());
     }
 
     @Test
     void testCreateUserUserAlreadyExists() {
         // Arrange
         String username = "existingUser";
-        RolesEnum roleEnum = RolesEnum.ROLE_USER;
+        RolesEnum roleEnum = RolesEnum.USER;
         AuthCreateUserRequest request = new AuthCreateUserRequest(username, "password",new AuthCreateRoleRequest(roleEnum.name()));
         when(userRepository.existsByUsername(username)).thenReturn(true);
 
@@ -140,7 +191,7 @@ class UserServiceTest {
         // Datos de prueba
         String username = "newUser";
         String rawPassword = "password";
-        RolesEnum roleEnum = RolesEnum.ROLE_USER;
+        RolesEnum roleEnum = RolesEnum.USER;
 
         AuthCreateUserRequest request = new AuthCreateUserRequest(username, rawPassword,
                 new AuthCreateRoleRequest(roleEnum.name()));
@@ -170,11 +221,23 @@ class UserServiceTest {
         String username = "testUser";
         String password = "password";
         String token = "jwtToken";
+
+
         Role mockRole = new Role();
-        mockRole.setRoleTypeEnum(RolesEnum.ROLE_USER);
+        mockRole.setRoleTypeEnum(RolesEnum.USER);
         mockRole.setRolePermissions(Set.of());
 
+
+
+
+        AuthenticationManager authManager = mock(AuthenticationManager.class);
+        Authentication authentication = mock(Authentication.class);
+
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authManager.authenticate(any(Authentication.class))).thenReturn(authentication);
+
         AuthLoginRequest loginRequest = new AuthLoginRequest(username, password);
+
 
         UserEntity mockUser = new UserEntity();
         mockUser.setUsername(username);
@@ -184,48 +247,73 @@ class UserServiceTest {
         mockUser.setAccountNoLocked(true);
         mockUser.setAccountNoExpired(true);
         mockUser.setCreadentialNoExpired(true);
-
+        String authorities = "ROLE_" + mockUser.getRoleType().getRoleTypeEnum().name();
 
         when(userRepository.findUserEntityByUsername(username)).thenReturn(Optional.of(mockUser));
         when(passwordEncoder.matches(password, mockUser.getPassword())).thenReturn(true);
-        when(jwtUtils.createToken(any())).thenReturn(token);
+        when(jwtUtils.createToken(username, authorities)).thenReturn(token);
 
         // Act
-        AuthResponse authResponse = userService.loginUser(loginRequest);
+        AuthResponse authResponse = userService.loginUser(loginRequest, authManager);
 
         // Assert
-        assertNotNull(authResponse, "AuthResponse should not be null");
-        assertEquals(username, authResponse.username(), "Username should match the expected value");
-        verify(jwtUtils, times(1)).createToken(any());
+        assertNotNull(authResponse);
+        assertEquals(username, authResponse.username());
+        verify(jwtUtils, times(1)).createToken(username, authorities);
         verify(userRepository, times(1)).findUserEntityByUsername(username);
+        verify(authManager, times(1)).authenticate(any(Authentication.class));
     }
 
     @Test
     void testLoginUserInvalidPassword() {
-        // Arrange
         String username = "testUser";
-        String password = "wrongPassword";
+        String password = "password";
+        String token = "jwtToken";
+
+
         Role mockRole = new Role();
-        mockRole.setRoleTypeEnum(RolesEnum.ROLE_USER);
+        mockRole.setRoleTypeEnum(RolesEnum.USER);
         mockRole.setRolePermissions(Set.of());
 
 
+
+
+        AuthenticationManager authManager = mock(AuthenticationManager.class);
+        Authentication authentication = mock(Authentication.class);
+
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authManager.authenticate(any(Authentication.class))).thenReturn(authentication);
+
         AuthLoginRequest loginRequest = new AuthLoginRequest(username, password);
+
 
         UserEntity mockUser = new UserEntity();
         mockUser.setUsername(username);
         mockUser.setPassword("encodedPassword");
         mockUser.setRoleType(mockRole);
-        mockUser.setIsEnable(false);
-        mockUser.setAccountNoLocked(false);
-        mockUser.setAccountNoExpired(false);
-        mockUser.setCreadentialNoExpired(false);
+        mockUser.setIsEnable(true);
+        mockUser.setAccountNoLocked(true);
+        mockUser.setAccountNoExpired(true);
+        mockUser.setCreadentialNoExpired(true);
+        String authorities = "ROLE_" + mockUser.getRoleType().getRoleTypeEnum().name();
+
+        when(userRepository.findUserEntityByUsername(username)).thenThrow(new BadCredentialsException("Invalid username or password"));
         when(passwordEncoder.matches(password, mockUser.getPassword())).thenReturn(false);
 
+
+
         // Act & Assert
-        Throwable ex = new Throwable("Invalid username or password");
-        assertEquals("Invalid username or password", ex.getMessage(), "Exception message should match");
-        verify(jwtUtils, never()).createToken(any());
+        BadCredentialsException exception = assertThrows(
+                BadCredentialsException.class,
+                () -> userService.loginUser(loginRequest, authManager)
+        );
+
+        assertEquals("Invalid username or password", exception.getMessage());
+
+
+        verify(userRepository, times(1)).findUserEntityByUsername(username);
+        verify(passwordEncoder, never()).matches(password, mockUser.getPassword());
+
     }
     @Test
     void testGetUser() {
@@ -389,6 +477,42 @@ class UserServiceTest {
         Assertions.assertTrue(updatedUser.getAccountNoLocked());
         Assertions.assertTrue(updatedUser.getCreadentialNoExpired());
     }
+    @Test
+    void testEditUserPasswordEmpty (){
+        // Datos de prueba
+        UserEntity inputUser = new UserEntity();
+        inputUser.setUsername("testUser");
+        inputUser.setPassword("");
+        inputUser.setIsEnable(true);
+        inputUser.setAccountNoExpired(true);
+        inputUser.setAccountNoLocked(true);
+        inputUser.setCreadentialNoExpired(true);
+
+        UserEntity existingUser = new UserEntity();
+        existingUser.setUsername("testUser");
+        existingUser.setPassword("oldPassword");
+        existingUser.setIsEnable(false);
+        existingUser.setAccountNoExpired(false);
+        existingUser.setAccountNoLocked(false);
+        existingUser.setCreadentialNoExpired(false);
+
+
+        when(userRepository.findUserEntityByUsername("testUser")).thenReturn(Optional.of(existingUser));
+
+
+        UserEntity updatedUser = userService.editUser(inputUser);
+
+
+        verify(userRepository, times(1)).findUserEntityByUsername("testUser");
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository).save(existingUser);
+
+        Assertions.assertEquals("oldPassword", updatedUser.getPassword());
+        Assertions.assertTrue(updatedUser.getIsEnable());
+        Assertions.assertTrue(updatedUser.getAccountNoExpired());
+        Assertions.assertTrue(updatedUser.getAccountNoLocked());
+        Assertions.assertTrue(updatedUser.getCreadentialNoExpired());
+    }
 
 
 
@@ -398,7 +522,7 @@ class UserServiceTest {
         String username = "testUser";
         String password = "testPassword";
         Role mockRole = new Role();
-        mockRole.setRoleTypeEnum(RolesEnum.ROLE_USER);
+        mockRole.setRoleTypeEnum(RolesEnum.USER);
         mockRole.setRolePermissions(Set.of());
         UserEntity userEntity = new UserEntity(
                 1L, username, "encodedPassword",
@@ -425,7 +549,7 @@ class UserServiceTest {
         String username = "testUser";
         String password = "wrongPassword";
         Role mockRole = new Role();
-        mockRole.setRoleTypeEnum(RolesEnum.ROLE_USER);
+        mockRole.setRoleTypeEnum(RolesEnum.USER);
         mockRole.setRolePermissions(Set.of());
         UserEntity userEntity = new UserEntity(
                 1L, username, "encodedPassword",

@@ -5,9 +5,11 @@ import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateUserReque
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthLoginRequest;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthResponse;
 import com.mycompany.springsecurity.authenticationSystem.model.UserEntity;
+import com.mycompany.springsecurity.authenticationSystem.repository.IUserRepository;
 import com.mycompany.springsecurity.authenticationSystem.service.IUserService;
 import com.mycompany.springsecurity.authenticationSystem.util.JwtUtils;
 import jakarta.persistence.EntityNotFoundException;
+import org.hibernate.validator.constraints.ModCheck;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -15,14 +17,18 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 public class UserControllerTest {
     @Mock
@@ -30,6 +36,10 @@ public class UserControllerTest {
 
     @Mock
     private JwtUtils jwtUtils;
+    @Mock
+    private  AuthenticationManager authManager;
+    @Mock
+    private IUserRepository userRepository;
 
     @InjectMocks
     private UserController userController;
@@ -82,7 +92,7 @@ public class UserControllerTest {
         ResponseEntity<?> response = userController.findUserById(userId);
 
         // Assert
-        assertEquals(404, response.getStatusCodeValue());
+        assertEquals(NOT_FOUND, response.getStatusCode());
         assertEquals("User not found", response.getBody());
         verify(userService, times(1)).finUserById(userId);
     }
@@ -105,16 +115,20 @@ public class UserControllerTest {
         // Arrange
         String username = "user_test";
         String password = "password";
+        String token = "token";
 
         AuthCreateUserRequest userRequest = new AuthCreateUserRequest("user_test",
                 "password", null);
+        AuthResponse authResponse = new AuthResponse(username, "Create user susccessfully", token, true);
+
+        when(userService.createUser(userRequest)).thenReturn(authResponse);
 
         // Act
         ResponseEntity<?> response = userController.createUser(userRequest);
 
         // Assert
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals("Create user susccessfully ", response.getBody());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(authResponse, response.getBody());
         verify(userService, times(1)).createUser(userRequest);
     }
 
@@ -127,7 +141,7 @@ public class UserControllerTest {
         ResponseEntity<?> response = userController.editUser(userEntity);
 
         // Assert
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("edit user susccessfully ", response.getBody());
         verify(userService, times(1)).editUser(userEntity);
     }
@@ -142,7 +156,7 @@ public class UserControllerTest {
         ResponseEntity<?> response = userController.editUser(userEntity);
 
         // Assert
-        assertEquals(404, response.getStatusCodeValue());
+        assertEquals(NOT_FOUND, response.getStatusCode());
         assertEquals("User not found", response.getBody());
         verify(userService, times(1)).editUser(userEntity);
     }
@@ -172,7 +186,7 @@ public class UserControllerTest {
         ResponseEntity<?> response = userController.deleteUser(userId);
 
         // Assert
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Delete user susccessfully", response.getBody());
         verify(userService, times(1)).deleteUserById(userId);
     }
@@ -187,7 +201,7 @@ public class UserControllerTest {
         ResponseEntity<?> response = userController.deleteUser(userId);
 
         // Assert
-        assertEquals(404, response.getStatusCodeValue());
+        assertEquals(NOT_FOUND, response.getStatusCode());
         assertEquals("User not found", response.getBody());
         verify(userService, times(1)).deleteUserById(userId);
     }
@@ -213,18 +227,22 @@ public class UserControllerTest {
         // Arrange
         String username = "test_user";
         String password = "password";
+
+        authManager.authenticate(new UsernamePasswordAuthenticationToken(
+                username, password
+        ));
         AuthLoginRequest loginRequest = new AuthLoginRequest(username, password);
         AuthResponse authResponse = new AuthResponse(username,  "Login susscessfully",
                 "accessToken", true);
-        when(userService.loginUser(loginRequest)).thenReturn(authResponse);
+        when(userService.loginUser(loginRequest, authManager)).thenReturn(authResponse);
 
         // Act
         ResponseEntity<?> response = userController.loginUser(loginRequest);
 
         // Assert
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(authResponse, response.getBody());
-        verify(userService, times(1)).loginUser(loginRequest);
+        verify(userService, times(1)).loginUser(loginRequest, authManager);
     }
 
     @Test
@@ -234,21 +252,33 @@ public class UserControllerTest {
         String password = "password";
 
         AuthLoginRequest loginRequest = new AuthLoginRequest(username, password);
-        doThrow(new BadCredentialsException("Invalid credentials")).when(userService).loginUser(loginRequest);
+
+
+
+
+        when(userRepository.findUserEntityByUsername(username))
+                .thenReturn(Optional.empty());
+
+        when(userService.loginUser(loginRequest, authManager))
+                .thenThrow(new BadCredentialsException("Invalid username or password"));
 
         // Act
         ResponseEntity<?> response = userController.loginUser(loginRequest);
 
         // Assert
-        assertEquals(404, response.getStatusCodeValue());
-        assertEquals("Invalid credentials", response.getBody());
-        verify(userService, times(1)).loginUser(loginRequest);
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals("Invalid username or password", response.getBody());
+
+       verify(userService, times(1)).loginUser(loginRequest, authManager);
+        verify(userRepository, times(0)).findUserEntityByUsername(username);
     }
     @Test
     void testLoginUserInternalError() {
         // Arrange
+
+
         AuthLoginRequest loginRequest = new AuthLoginRequest("username", "password");
-        doThrow(new RuntimeException("Server internal Error")).when(userService).loginUser(loginRequest);
+        doThrow(new RuntimeException("Server internal Error")).when(userService).loginUser(loginRequest, authManager);
 
         // Act
         ResponseEntity<?> response = userController.loginUser(loginRequest);
@@ -258,6 +288,6 @@ public class UserControllerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals("Server internal Error", response.getBody());
 
-        verify(userService, times(1)).loginUser(loginRequest);
+        verify(userService, times(1)).loginUser(loginRequest, authManager);
     }
 }

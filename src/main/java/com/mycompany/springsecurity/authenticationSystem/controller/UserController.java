@@ -83,7 +83,8 @@ public class UserController {
     @PostMapping("/log-in")
     public ResponseEntity<?> loginUser (@RequestBody @Valid AuthLoginRequest userRequest){
         try {
-            return new ResponseEntity<>(this.userService.loginUser(userRequest, authenticationManager), HttpStatus.OK);
+            AuthResponse authResponse = userService.loginUser(userRequest, authenticationManager);
+            return  ResponseEntity.ok(authResponse);
         } catch (BadCredentialsException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
         } catch (Exception ex) {

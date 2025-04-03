@@ -124,7 +124,7 @@ public class UserService implements UserDetailsService, IUserService {
         String username = authLoginRequest.username();
         String password = authLoginRequest.password();
 
-        try{
+
             Authentication authToken = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
             );
@@ -139,9 +139,7 @@ public class UserService implements UserDetailsService, IUserService {
 
             String accessToken = jwtUtils.createToken(userDetails.getUsername(), authorities);
             return new AuthResponse(username, "Login Successfully", accessToken, true);
-        }catch (BadCredentialsException ex){
-            throw new BadCredentialsException("Invalid username or password");
-        }
+
 
     }
     public Authentication authenticate(String username, String password){
@@ -197,7 +195,6 @@ public class UserService implements UserDetailsService, IUserService {
         AuthResponse authResponse = new AuthResponse(userEntity.getUsername(), "User created successfully", accessToken, true);
 
         return authResponse;
-
     }
 
 
