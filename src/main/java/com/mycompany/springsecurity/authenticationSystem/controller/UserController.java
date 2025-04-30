@@ -52,7 +52,7 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     public  ResponseEntity<?> createUser(@RequestBody @Valid AuthCreateUserRequest userRequest){
 
-        return  ResponseEntity.ok(userService.createUser(userRequest)  );
+        return  ResponseEntity.ok(userService.createUser(userRequest));
     }
     @PutMapping("/edit")
     public ResponseEntity<?> editUser(@RequestBody UserEntity userEntity) {
