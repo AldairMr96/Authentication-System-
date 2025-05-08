@@ -1,4 +1,4 @@
-package com.mycompany.springsecurity.authenticationSystem.service;
+package com.mycompany.springsecurity.authenticationSystem.service.test;
 
 import com.jayway.jsonpath.internal.function.text.Concatenate;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateRoleRequest;
@@ -8,6 +8,7 @@ import com.mycompany.springsecurity.authenticationSystem.dto.AuthResponse;
 import com.mycompany.springsecurity.authenticationSystem.model.*;
 import com.mycompany.springsecurity.authenticationSystem.repository.IRoleRepository;
 import com.mycompany.springsecurity.authenticationSystem.repository.IUserRepository;
+import com.mycompany.springsecurity.authenticationSystem.service.UserService;
 import com.mycompany.springsecurity.authenticationSystem.util.JwtUtils;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Assertions;

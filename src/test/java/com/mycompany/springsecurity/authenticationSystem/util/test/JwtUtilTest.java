@@ -1,4 +1,4 @@
-package com.mycompany.springsecurity.authenticationSystem.utilTest;
+package com.mycompany.springsecurity.authenticationSystem.util.test;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTDecodeException;

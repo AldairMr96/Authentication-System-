@@ -1,4 +1,4 @@
-package com.mycompany.springsecurity.authenticationSystem.controllerTest;
+package com.mycompany.springsecurity.authenticationSystem.controller.test;
 
 import com.mycompany.springsecurity.authenticationSystem.controller.UserController;
 import com.mycompany.springsecurity.authenticationSystem.dto.AuthCreateUserRequest;
