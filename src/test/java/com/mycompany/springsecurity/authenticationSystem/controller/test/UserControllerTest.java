@@ -35,8 +35,6 @@ public class UserControllerTest {
     private IUserService userService;
 
     @Mock
-    private JwtUtils jwtUtils;
-    @Mock
     private  AuthenticationManager authManager;
     @Mock
     private IUserRepository userRepository;
