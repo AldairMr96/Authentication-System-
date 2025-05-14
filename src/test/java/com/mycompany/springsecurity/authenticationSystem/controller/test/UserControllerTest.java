@@ -7,9 +7,7 @@ import com.mycompany.springsecurity.authenticationSystem.dto.AuthResponse;
 import com.mycompany.springsecurity.authenticationSystem.model.UserEntity;
 import com.mycompany.springsecurity.authenticationSystem.repository.IUserRepository;
 import com.mycompany.springsecurity.authenticationSystem.service.IUserService;
-import com.mycompany.springsecurity.authenticationSystem.util.JwtUtils;
 import jakarta.persistence.EntityNotFoundException;
-import org.hibernate.validator.constraints.ModCheck;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -24,11 +22,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.*;
 
 public class UserControllerTest {
     @Mock
@@ -163,7 +159,7 @@ public class UserControllerTest {
         // Arrange
         UserEntity userEntity = new UserEntity();
         userEntity.setUsername("testUser");
-        doThrow(new RuntimeException("Server internal Error")).when(userService).editUser(userEntity);
+        doThrow().when(userService).editUser(userEntity);
 
         // Act
         ResponseEntity<?> response = userController.editUser(userEntity);

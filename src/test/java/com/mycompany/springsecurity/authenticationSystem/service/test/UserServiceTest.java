@@ -228,9 +228,6 @@ class UserServiceTest {
         mockRole.setRoleTypeEnum(RolesEnum.USER);
         mockRole.setRolePermissions(Set.of());
 
-
-
-
         AuthenticationManager authManager = mock(AuthenticationManager.class);
         Authentication authentication = mock(Authentication.class);
 
@@ -536,12 +533,13 @@ class UserServiceTest {
         when(passwordEncoder.matches(password, "encodedPassword")).thenReturn(true);
 
         // Act
-        UsernamePasswordAuthenticationToken result = (UsernamePasswordAuthenticationToken) userService.authenticate(username, password);
+        UsernamePasswordAuthenticationToken result =
+                (UsernamePasswordAuthenticationToken) userService.authenticate(username, password);
 
         // Assert
-        assertNotNull(result, "El resultado no debe ser nulo");
-        assertEquals(username, result.getPrincipal(), "El principal debe ser el nombre de usuario");
-        assertEquals("encodedPassword", result.getCredentials(), "Las credenciales deben coincidir con la contraseña codificada");
+        assertNotNull(result);
+        assertEquals(username, result.getPrincipal());
+        assertEquals("encodedPassword", result.getCredentials());
     }
 
     @Test
